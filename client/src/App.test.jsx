@@ -1,18 +1,68 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from './App';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-describe('App', () => {
-    it('renders ShopSmart title', () => {
-        // Mock fetch
-        global.fetch = vi.fn(() =>
-            Promise.resolve({
-                json: () => Promise.resolve({ status: 'ok', message: 'Test Msg', timestamp: 'now' })
-            })
-        );
+// Mock localStorage
+const localStorageMock = (() => {
+  let store = {};
+  return {
+    getItem: (key) => store[key] || null,
+    setItem: (key, value) => { store[key] = value; },
+    removeItem: (key) => { delete store[key]; },
+    clear: () => { store = {}; }
+  };
+})();
+Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
-        render(<App />);
-        const linkElement = screen.getByText(/ShopSmart/i);
-        expect(linkElement).toBeInTheDocument();
+describe('App Component', () => {
+  beforeEach(() => {
+    localStorageMock.clear();
+    vi.clearAllMocks();
+  });
+
+  it('renders the auth page when no token is present', async () => {
+    // Mock health check to prevent network errors
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ status: 'ok' })
+      })
+    );
+
+    render(<App />);
+    // After boot, should show auth page
+    await waitFor(() => {
+      expect(screen.getByText(/Pawfect FurEver/i)).toBeInTheDocument();
     });
+  });
+
+  it('shows login form by default', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Unauthorized' })
+      })
+    );
+
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText(/Sign In/i)).toBeInTheDocument();
+    });
+  });
+
+  it('can switch to register tab', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Unauthorized' })
+      })
+    );
+
+    render(<App />);
+    await waitFor(() => {
+      const registerTab = screen.getByText(/Create Account/i);
+      fireEvent.click(registerTab);
+      expect(screen.getByPlaceholderText(/Jane Smith/i)).toBeInTheDocument();
+    });
+  });
 });
