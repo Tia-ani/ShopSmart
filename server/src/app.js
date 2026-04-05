@@ -1,138 +1,58 @@
 const express = require('express');
 const cors = require('cors');
 
+const { router: authRouter } = require('./routes/auth');
+const { router: productsRouter } = require('./routes/products');
+const { router: ordersRouter } = require('./routes/orders');
+const { router: profileRouter } = require('./routes/profile');
+const { router: reviewsRouter } = require('./routes/reviews');
+const { router: wishlistRouter } = require('./routes/wishlist');
+
 const app = express();
 
-app.use(cors());
+// ─── Middleware ───────────────────────────────────────────────
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  credentials: true
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Pawfect FurEver Backend is running', timestamp: new Date().toISOString() });
+// Request logging middleware
+app.use((req, _res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
 });
 
-// Mock data
-const products = [
-  { id: 1, name: 'Premium Dog Food', category: 'food', petType: 'dog', price: 49.99, image: 'https://via.placeholder.com/200', rating: 4.5, stock: 50 },
-  { id: 2, name: 'Cat Scratching Post', category: 'toys', petType: 'cat', price: 29.99, image: 'https://via.placeholder.com/200', rating: 4.8, stock: 30 },
-  { id: 3, name: 'Dog Leash', category: 'accessories', petType: 'dog', price: 19.99, image: 'https://via.placeholder.com/200', rating: 4.3, stock: 100 },
-  { id: 4, name: 'Cat Litter Box', category: 'accessories', petType: 'cat', price: 39.99, image: 'https://via.placeholder.com/200', rating: 4.6, stock: 25 },
-  { id: 5, name: 'Bird Cage', category: 'accessories', petType: 'bird', price: 89.99, image: 'https://via.placeholder.com/200', rating: 4.7, stock: 15 },
-  { id: 6, name: 'Fish Tank Filter', category: 'accessories', petType: 'fish', price: 34.99, image: 'https://via.placeholder.com/200', rating: 4.4, stock: 40 },
-];
-
-const users = [];
-const orders = [];
-let orderIdCounter = 1;
-
-// Auth endpoints
-app.post('/api/auth/register', (req, res) => {
-  const { email, password, name } = req.body;
-  
-  if (users.find(u => u.email === email)) {
-    return res.status(400).json({ error: 'User already exists' });
-  }
-  
-  const user = { id: users.length + 1, email, password, name, petProfile: null };
-  users.push(user);
-  
-  const token = Buffer.from(JSON.stringify({ id: user.id, email: user.email })).toString('base64');
-  res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+// ─── Health Check ─────────────────────────────────────────────
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'Pawfect FurEver API',
+    version: '2.0.0',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  const user = users.find(u => u.email === email && u.password === password);
-  
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-  
-  const token = Buffer.from(JSON.stringify({ id: user.id, email: user.email })).toString('base64');
-  res.json({ token, user: { id: user.id, email: user.email, name: user.name, petProfile: user.petProfile } });
+// ─── Routes ───────────────────────────────────────────────────
+app.use('/api/auth', authRouter);
+app.use('/api/products', productsRouter);
+app.use('/api/orders', ordersRouter);
+app.use('/api/profile', profileRouter);
+app.use('/api/reviews', reviewsRouter);
+app.use('/api/wishlist', wishlistRouter);
+
+// ─── 404 Handler ──────────────────────────────────────────────
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
-// Pet profile endpoints
-app.post('/api/profile/pet', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-  
-  const token = authHeader.replace('Bearer ', '');
-  const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
-  const user = users.find(u => u.id === decoded.id);
-  
-  if (!user) return res.status(401).json({ error: 'Unauthorized' });
-  
-  user.petProfile = req.body;
-  res.json({ petProfile: user.petProfile });
-});
-
-app.get('/api/profile/pet', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-  
-  const token = authHeader.replace('Bearer ', '');
-  const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
-  const user = users.find(u => u.id === decoded.id);
-  
-  if (!user) return res.status(401).json({ error: 'Unauthorized' });
-  
-  res.json({ petProfile: user.petProfile });
-});
-
-// Product endpoints
-app.get('/api/products', (req, res) => {
-  const { petType, category } = req.query;
-  let filtered = products;
-  
-  if (petType) {
-    filtered = filtered.filter(p => p.petType === petType);
-  }
-  if (category) {
-    filtered = filtered.filter(p => p.category === category);
-  }
-  
-  res.json({ products: filtered });
-});
-
-app.get('/api/products/:id', (req, res) => {
-  const product = products.find(p => p.id === parseInt(req.params.id));
-  if (!product) {
-    return res.status(404).json({ error: 'Product not found' });
-  }
-  res.json({ product });
-});
-
-// Order endpoints
-app.post('/api/orders', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-  
-  const token = authHeader.replace('Bearer ', '');
-  const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
-  
-  const order = {
-    id: orderIdCounter++,
-    userId: decoded.id,
-    items: req.body.items,
-    total: req.body.total,
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  };
-  
-  orders.push(order);
-  res.status(201).json({ order });
-});
-
-app.get('/api/orders', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-  
-  const token = authHeader.replace('Bearer ', '');
-  const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
-  
-  const userOrders = orders.filter(o => o.userId === decoded.id);
-  res.json({ orders: userOrders });
+// ─── Global Error Handler ─────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 module.exports = app;
