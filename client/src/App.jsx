@@ -41,7 +41,6 @@ function AuthPage({ onAuth }) {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { addToast } = useToast();
 
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
 
@@ -79,7 +78,7 @@ function AuthPage({ onAuth }) {
         <div className="auth-logo">
           <span className="logo-icon">🐾</span>
           <h1>Pawfect FurEver</h1>
-          <p>Your pet's favourite online store</p>
+          <p className="auth-subtitle">Your pet&apos;s favourite online store</p>
         </div>
 
         <div className="auth-tabs">
@@ -165,7 +164,7 @@ function PetOnboarding({ token, onComplete }) {
           </div>
           <h2>Tell us about your pet!</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
-            We'll personalise your shopping experience just for them
+            <p>We need a little info to tailor your pet&apos;s experience</p> just for them
           </p>
         </div>
 
@@ -188,7 +187,7 @@ function PetOnboarding({ token, onComplete }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Pet's Name (optional)</label>
+            <label className="form-label">Pet&apos;s Name (optional)</label>
             <input id="pet-name" className="form-input" type="text" placeholder="e.g. Buddy, Whiskers" value={petName} onChange={e => setPetName(e.target.value)} />
           </div>
 
@@ -226,7 +225,7 @@ function ProductCard({ product, onAddToCart, onWishlist, inWishlist }) {
         <button
           className={`wishlist-btn ${inWishlist ? 'active' : ''}`}
           onClick={() => onWishlist(product.id)}
-          title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+          title="Wishlist"
         >
           {inWishlist ? '❤️' : '🤍'}
         </button>
@@ -265,7 +264,7 @@ function ProductCard({ product, onAddToCart, onWishlist, inWishlist }) {
 }
 
 // ─── Products View ─────────────────────────────────────────────
-function ProductsView({ token, petProfile, cart, onAddToCart, wishlist, onWishlist }) {
+function ProductsView({ petProfile, onAddToCart, wishlist, onWishlist }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -638,7 +637,7 @@ function OrdersView({ token }) {
 // ─── Main App ──────────────────────────────────────────────────
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [user, setUser] = useState(null);
+  const [, setUser] = useState(null);
   const [petProfile, setPetProfile] = useState(null);
   const [view, setView] = useState('products');
   const [cart, setCart] = useState([]);

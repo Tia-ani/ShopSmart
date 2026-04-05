@@ -22,7 +22,7 @@ describe('App Component', () => {
 
   it('renders the auth page when no token is present', async () => {
     // Mock health check to prevent network errors
-    global.fetch = vi.fn(() =>
+    globalThis.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ status: 'ok' })
@@ -37,7 +37,7 @@ describe('App Component', () => {
   });
 
   it('shows login form by default', async () => {
-    global.fetch = vi.fn(() =>
+    globalThis.fetch = vi.fn(() =>
       Promise.resolve({
         ok: false,
         json: () => Promise.resolve({ error: 'Unauthorized' })
@@ -51,7 +51,7 @@ describe('App Component', () => {
   });
 
   it('can switch to register tab', async () => {
-    global.fetch = vi.fn(() =>
+    globalThis.fetch = vi.fn(() =>
       Promise.resolve({
         ok: false,
         json: () => Promise.resolve({ error: 'Unauthorized' })
