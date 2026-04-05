@@ -3,10 +3,6 @@
   "version": "2.0.0",
   "description": "Pawfect FurEver — Full Stack DevOps Pet E-Commerce Platform",
   "private": true,
-  "workspaces": [
-    "client",
-    "server"
-  ],
   "scripts": {
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
