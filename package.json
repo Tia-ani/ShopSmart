@@ -1,0 +1,23 @@
+{
+  "name": "pawfect-furever",
+  "version": "2.0.0",
+  "description": "Pawfect FurEver — Full Stack DevOps Pet E-Commerce Platform",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "test:backend": "npm test --prefix server",
+    "test:frontend": "npm test --prefix client -- --run",
+    "test:e2e": "npx playwright test",
+    "lint:backend": "npm run lint --prefix server",
+    "lint:frontend": "npm run lint --prefix client",
+    "lint": "npm run lint:backend && npm run lint:frontend"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  }
+}
