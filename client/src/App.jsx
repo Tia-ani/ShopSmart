@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import './index.css';
+import LandingPage from './LandingPage';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -76,7 +77,9 @@ function AuthPage({ onAuth }) {
     <div className="auth-wrapper">
       <div className="auth-card">
         <div className="auth-logo">
-          <span className="logo-icon">🐾</span>
+          <span className="logo-icon" style={{ display: 'inline-flex' }}>
+            <img src="/pets/dog.png" alt="logo" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+          </span>
           <h1>Pawfect FurEver</h1>
           <p className="auth-subtitle">Your pet&apos;s favourite online store</p>
         </div>
@@ -128,12 +131,12 @@ function PetOnboarding({ token, onComplete }) {
   const [loading, setLoading] = useState(false);
 
   const petOptions = [
-    { value: 'dog', emoji: '🐕', label: 'Dog' },
-    { value: 'cat', emoji: '🐈', label: 'Cat' },
-    { value: 'bird', emoji: '🐦', label: 'Bird' },
-    { value: 'fish', emoji: '🐟', label: 'Fish' },
-    { value: 'rabbit', emoji: '🐇', label: 'Rabbit' },
-    { value: 'hamster', emoji: '🐹', label: 'Hamster' },
+    { value: 'dog', img: '/pets/dog.png', label: 'Dog' },
+    { value: 'cat', img: '/pets/cat.png', label: 'Cat' },
+    { value: 'bird', img: '/pets/bird.png', label: 'Bird' },
+    { value: 'fish', img: '/pets/fish.png', label: 'Fish' },
+    { value: 'rabbit', img: '/pets/rabbit.png', label: 'Rabbit' },
+    { value: 'hamster', img: '/pets/hamster.png', label: 'Hamster' },
   ];
 
   const handleSubmit = async (e) => {
@@ -159,8 +162,12 @@ function PetOnboarding({ token, onComplete }) {
     <div className="onboarding-wrapper">
       <div className="onboarding-card">
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
-            {petType ? petOptions.find(p => p.value === petType)?.emoji : '🐾'}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+            <img 
+              src={petType ? petOptions.find(p => p.value === petType)?.img : '/pets/dog.png'} 
+              alt="pet" 
+              style={{ width: 64, height: 64, objectFit: 'contain' }} 
+            />
           </div>
           <h2>Tell us about your pet!</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
@@ -179,7 +186,9 @@ function PetOnboarding({ token, onComplete }) {
                   className={`pet-type-option ${petType === opt.value ? 'selected' : ''}`}
                   onClick={() => setPetType(opt.value)}
                 >
-                  <span className="pet-emoji">{opt.emoji}</span>
+                  <span className="pet-emoji" style={{ display: 'flex' }}>
+                    <img src={opt.img} alt={opt.label} style={{ width: 36, height: 36, objectFit: 'contain' }} />
+                  </span>
                   <span className="pet-label">{opt.label}</span>
                 </button>
               ))}
@@ -272,7 +281,7 @@ function ProductsView({ petProfile, onAddToCart, wishlist, onWishlist }) {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sort, setSort] = useState('');
 
-  const petEmojis = { dog: '🐕', cat: '🐈', bird: '🐦', fish: '🐟', rabbit: '🐇', hamster: '🐹' };
+  const petImages = { dog: '/pets/dog.png', cat: '/pets/cat.png', bird: '/pets/bird.png', fish: '/pets/fish.png', rabbit: '/pets/rabbit.png', hamster: '/pets/hamster.png' };
   const categories = ['food', 'toys', 'accessories', 'bedding', 'training', 'tech', 'housing'];
 
   const fetchProducts = useCallback(async () => {
@@ -308,7 +317,7 @@ function ProductsView({ petProfile, onAddToCart, wishlist, onWishlist }) {
           <div className="hero-text">
             <h2>
               {petProfile.petName
-                ? `Shopping for ${petProfile.petName} 🐾`
+                ? `Shopping for ${petProfile.petName}`
                 : `Perfect picks for your ${petProfile.petType}!`}
             </h2>
             <p>
@@ -320,7 +329,9 @@ function ProductsView({ petProfile, onAddToCart, wishlist, onWishlist }) {
               <span className="tag">Type: {petProfile.petType}</span>
             </div>
           </div>
-          <div className="hero-emoji">{petEmojis[petProfile.petType] || '🐾'}</div>
+          <div className="hero-emoji" style={{ display: 'flex' }}>
+            <img src={petImages[petProfile.petType] || '/pets/dog.png'} alt="pet" style={{ width: 120, height: 120, objectFit: 'contain' }} />
+          </div>
         </div>
       )}
 
@@ -341,8 +352,9 @@ function ProductsView({ petProfile, onAddToCart, wishlist, onWishlist }) {
             key={pt}
             className={`filter-chip ${petFilter === pt ? 'active' : ''}`}
             onClick={() => setPetFilter(petFilter === pt ? '' : pt)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', textTransform: 'capitalize' }}
           >
-            {petEmojis[pt]} {pt}
+            <img src={petImages[pt]} alt={pt} style={{ width: 18, height: 18, objectFit: 'contain' }} /> {pt}
           </button>
         ))}
 
@@ -685,7 +697,7 @@ function App() {
 
   const handlePetComplete = (profile) => {
     setPetProfile(profile);
-    addToast(`Profile saved for your ${profile.petType}! 🐾`, 'success');
+    addToast(`Profile saved for your ${profile.petType}!`, 'success');
   };
 
   const logout = () => {
@@ -740,6 +752,9 @@ function App() {
     setView('orders');
   };
 
+  // Landing page state — shown before login
+  const [showLanding, setShowLanding] = useState(!token);
+
   if (!appReady) {
     return (
       <div className="loading-screen">
@@ -749,10 +764,14 @@ function App() {
     );
   }
 
+  if (showLanding && !token) {
+    return <LandingPage onEnter={() => setShowLanding(false)} />;
+  }
+
   if (!token) return <AuthPage onAuth={handleAuth} />;
   if (!petProfile) return <PetOnboarding token={token} onComplete={handlePetComplete} />;
 
-  const petEmojis = { dog: '🐕', cat: '🐈', bird: '🐦', fish: '🐟', rabbit: '🐇', hamster: '🐹' };
+  const petImages = { dog: '/pets/dog.png', cat: '/pets/cat.png', bird: '/pets/bird.png', fish: '/pets/fish.png', rabbit: '/pets/rabbit.png', hamster: '/pets/hamster.png' };
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
   return (
@@ -760,7 +779,9 @@ function App() {
       <nav className="navbar">
         <div className="navbar-inner">
           <a className="navbar-logo" href="#" onClick={() => setView('products')}>
-            <span className="logo-emoji">🐾</span>
+            <span className="logo-emoji" style={{ display: 'flex' }}>
+              <img src="/pets/dog.png" alt="logo" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+            </span>
             <span>Pawfect FurEver</span>
           </a>
 
@@ -782,8 +803,9 @@ function App() {
           </div>
 
           <div className="nav-actions">
-            <span className="pet-badge">
-              {petEmojis[petProfile.petType]} {petProfile.petName || petProfile.petBreed}
+            <span className="pet-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <img src={petImages[petProfile.petType] || '/pets/dog.png'} alt="pet" style={{ width: 20, height: 20, objectFit: 'contain' }} />
+              {petProfile.petName || petProfile.petBreed}
             </span>
 
             <div className="cart-btn">
