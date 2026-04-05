@@ -1,65 +1,158 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline — Pawfect FurEver
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
-  client:
-    name: Frontend CI
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./client
-
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Use Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: './client/package-lock.json'
-
-    - name: Install Dependencies
-      run: npm ci
-
-    - name: Run Tests
-      run: npm test
-
-    - name: Build Application
-      run: npm run build
-
-    - name: Build Docker Image
-      run: docker build -t pawfect-client:${{ github.sha }} .
-
-  server:
-    name: Backend CI
+  # ─── Backend: Lint, Test, Build ───────────────────────────────
+  backend:
+    name: Backend — Lint, Unit & Integration Tests
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./server
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Use Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: './server/package-lock.json'
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './server/package-lock.json'
 
-    - name: Install Dependencies
-      run: npm ci
+      - name: Install Dependencies
+        run: npm ci
 
-    - name: Run Tests
-      run: npm test -- --passWithNoTests
+      - name: Run Linter
+        run: npm run lint
 
-    - name: Build Docker Image
-      run: docker build -t pawfect-server:${{ github.sha }} .
+      - name: Run Unit Tests
+        run: npm run test:unit
+
+      - name: Run Integration Tests
+        run: npm run test:integration
+
+      - name: Run All Tests with Coverage
+        run: npm run test:coverage
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: ./server/coverage/
+
+      - name: Build Docker Image
+        run: docker build -t pawfect-server:${{ github.sha }} .
+
+  # ─── Frontend: Lint, Test, Build ─────────────────────────────
+  frontend:
+    name: Frontend — Lint, Tests, Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './client/package-lock.json'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Frontend Tests
+        run: npm test -- --run
+
+      - name: Build Production Bundle
+        run: npm run build
+        env:
+          VITE_API_URL: https://api.pawfect-furever.com
+
+      - name: Build Docker Image
+        run: docker build -t pawfect-client:${{ github.sha }} .
+
+  # ─── Security: Dependency Audit ──────────────────────────────
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Audit Backend Dependencies
+        working-directory: ./server
+        run: npm audit --audit-level=high || true
+
+      - name: Audit Frontend Dependencies
+        working-directory: ./client
+        run: npm audit --audit-level=high || true
+
+  # ─── Deploy to EC2 (on push to main only) ────────────────────
+  deploy:
+    name: Deploy to AWS EC2
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy App to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER || 'ubuntu' }}
+        run: |
+          ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'ENDSSH'
+            set -e
+            echo "=== Starting Pawfect FurEver Deployment ==="
+
+            # Idempotent: create dir only if it doesn't exist
+            mkdir -p /home/ubuntu/pawfect-furever
+
+            cd /home/ubuntu/pawfect-furever
+
+            # Pull latest code
+            if [ -d ".git" ]; then
+              git pull origin main
+            else
+              git clone https://github.com/${{ github.repository }}.git .
+            fi
+
+            # Install server deps
+            cd server && npm ci --omit=dev
+            cd ..
+
+            # Restart server (idempotent: works whether running or not)
+            pm2 restart pawfect-server 2>/dev/null || pm2 start server/src/index.js --name pawfect-server
+            pm2 save
+
+            echo "=== Deployment Complete ==="
+          ENDSSH
+
+      - name: Deployment Status
+        if: success()
+        run: echo "✅ Deployed successfully to EC2 at ${{ secrets.EC2_HOST }}"
