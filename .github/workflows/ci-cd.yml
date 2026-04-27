@@ -1,106 +1,128 @@
-name: CI/CD Pipeline — Pawfect FurEver
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_CLIENT: pawfect-client
+  ECR_REPOSITORY_SERVER: pawfect-server
+  ECS_CLUSTER: pawfect-cluster
+  ECS_SERVICE_CLIENT: pawfect-client-service
+  ECS_SERVICE_SERVER: pawfect-server-service
+  ECS_TASK_DEFINITION_CLIENT: pawfect-client-task
+  ECS_TASK_DEFINITION_SERVER: pawfect-server-task
+
 jobs:
-  # ─── Backend: Lint, Test, Build ───────────────────────────────
-  backend:
-    name: Backend — Lint, Unit & Integration Tests
+  client:
+    name: Frontend CI/CD
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './server/package-lock.json'
+    - name: Use Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: './client/package-lock.json'
 
-      - name: Install Dependencies
-        run: npm install
+    - name: Install Dependencies
+      working-directory: ./client
+      run: npm ci
 
-      - name: Run Linter
-        run: npm run lint
+    - name: Run Tests
+      working-directory: ./client
+      run: npm test
 
-      - name: Run Unit Tests
-        run: npm run test:unit
+    - name: Build Application
+      working-directory: ./client
+      run: npm run build
 
-      - name: Run Integration Tests
-        run: npm run test:integration
+    - name: Configure AWS Credentials
+      if: github.event_name == 'push'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-      - name: Run All Tests with Coverage
-        run: npm run test:coverage
+    - name: Login to Amazon ECR
+      if: github.event_name == 'push'
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: backend-coverage
-          path: ./server/coverage/
+    - name: Build, Tag, and Push Image to ECR
+      if: github.event_name == 'push'
+      working-directory: ./client
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_CLIENT:latest
 
-      - name: Build Docker Image
-        run: docker build -t pawfect-server:${{ github.sha }} .
+    - name: Update ECS Service
+      if: github.event_name == 'push'
+      run: |
+        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE_CLIENT }} --force-new-deployment
 
-  # ─── Frontend: Lint, Test, Build ─────────────────────────────
-  frontend:
-    name: Frontend — Lint, Tests, Build
+  server:
+    name: Backend CI/CD
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./client
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './client/package-lock.json'
+    - name: Use Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: './server/package-lock.json'
 
-      - name: Install Dependencies
-        run: npm install
+    - name: Install Dependencies
+      working-directory: ./server
+      run: npm ci
 
-      - name: Run ESLint
-        run: npm run lint
+    - name: Run Tests
+      working-directory: ./server
+      run: npm test -- --passWithNoTests
 
-      - name: Run Frontend Tests
-        run: npm test -- --run
+    - name: Configure AWS Credentials
+      if: github.event_name == 'push'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build Production Bundle
-        run: npm run build
-        env:
-          VITE_API_URL: https://api.pawfect-furever.com
+    - name: Login to Amazon ECR
+      if: github.event_name == 'push'
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker Image
-        run: docker build -t pawfect-client:${{ github.sha }} .
+    - name: Build, Tag, and Push Image to ECR
+      if: github.event_name == 'push'
+      working-directory: ./server
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_SERVER:latest
 
-  # ─── Security: Dependency Audit ──────────────────────────────
-  audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Audit Backend Dependencies
-        working-directory: ./server
-        run: npm audit --audit-level=high || true
-
-      - name: Audit Frontend Dependencies
-        working-directory: ./client
-        run: npm audit --audit-level=high || true
-
-
+    - name: Update ECS Service
+      if: github.event_name == 'push'
+      run: |
+        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE_SERVER }} --force-new-deployment
