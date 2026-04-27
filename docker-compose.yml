@@ -37,7 +37,7 @@ services:
       context: ./client
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:3000
+        VITE_API_URL: http://13.51.79.11:3000
     container_name: pawfect-client
     restart: unless-stopped
     ports:
