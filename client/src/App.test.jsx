@@ -32,7 +32,7 @@ describe('App Component', () => {
     render(<App />);
     // After boot, should show auth page
     await waitFor(() => {
-      expect(screen.getByText(/Pawfect FurEver/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Sign In/i)[0]).toBeInTheDocument();
     });
   });
 
